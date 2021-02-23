@@ -7,28 +7,78 @@ const stripe = require('stripe')(`${process.env.STRIPE_PUBLIC_KEY}`)
 app.use(express.json());
 
 app.post('/product', async (req, res) => {
-    const uniquID = uuid();
-
-    const product = await stripe.products.create({
-        id: uniquID,
-        name: 'Shopnow ECommarce',
-        description: "This is fully functionaly E-Commarce site"
-      }).then((response) => {
-          console.log("Response => ", response);
-      }).catch((err) => {
-          console.log("Error => ", err);
-      })
+    try {
+        const bodyData = req.body
+        if(!bodyData.name || !bodyData.description){
+            return res.status(400).json({sucess: "false", error: "Please fill all the field"});
+        }
+        const product = await stripe.products.create({
+            name: bodyData.name,
+            description: bodyData.description
+          })
+        res.status(200).json({sucess: "true", product });
+    } catch (error) {
+        res.status(400).json({sucess: "false", error: error.message})
+    }
 });
+
+app.post('/plane', async(req,res) => {
+    try {
+        const bodyData = req.body
+        console.log("BodyData => ", bodyData)
+        if(!bodyData.amount || !bodyData.currency || !bodyData.interval || !bodyData.product) {
+            throw new Error("Please fill all the field");
+        }
+        const plane = await stripe.plans.create({
+            amount: bodyData.amount * 100,
+            currency: bodyData.currency,
+            interval: bodyData.interval,
+            product: bodyData.product,
+            active: bodyData.active
+        })
+        res.status(200).json({sucess: "true", plane });
+    } catch (error) {
+        res.status(400).json({sucess: "false", error: error.message})
+    }
+})
+
+app.post('/updatePlane', async (req,res) => {
+    try {
+        const bodyData = req.body
+        const plane = await stripe.plans.update(bodyData.planeId,{
+            active: bodyData.active
+        })
+        res.status(200).json({sucess: "true", plane });
+    } catch (error) {
+        res.status(400).json({sucess: "false", error: error.message})
+    }
+})
+
+app.post('/subsription', async (req,res) => {
+    try {
+        const bodyData = req.body
+        if(!bodyData.customerId || !bodyData.planeId ) {
+            throw new Error("Please fill all the field");
+        }
+        const subscription = await stripe.subscriptions.create({
+            customer: bodyData.customerId,
+            items: [
+                {price: bodyData.planeId},
+              ],
+        })
+        res.status(200).json({sucess: "true", subscription });
+    } catch (error) {
+        res.status(400).json({sucess: "false", error: error.message});
+    }
+})
 
 app.post('/payment', async (req, res) => {
     try {
     const bodyData = req.body
-    console.log("bodyData => ", bodyData)
     var createCustomer;
     createCustomer = await stripe.customers.list({
         email: bodyData.email
     })
-    console.log("{}{}{}{}{}{", createCustomer);
     if(createCustomer.data.length == 0) {
         createCustomer = await stripe.customers.create({
             name: bodyData.fullname,
@@ -46,7 +96,6 @@ app.post('/payment', async (req, res) => {
     }
     let createToken;
     if(bodyData.paymentMethod == 'card'){
-        console.log("Body Data => ", bodyData)
         createToken = await stripe.tokens.create({
             card: {
                 name: bodyData.cardName,
@@ -70,7 +119,7 @@ app.post('/payment', async (req, res) => {
         })
     }
     let createCharge = await stripe.charges.create({
-            amount: 300,
+            amount: bodyData.price * 100,
             currency: 'INR',
             source: createToken.id, 
             customer: createCustomer.id,
@@ -79,8 +128,7 @@ app.post('/payment', async (req, res) => {
         })
     return res.status(200).json({sucess: 'true', customer: createCustomer, token: createToken, charge: createCharge})
 } catch (error) {
-    console.log("Error => ", error)
-    return res.status(400).json({ sucess: "false", message: "There is some error end of us"});
+    return res.status(400).json({ sucess: "false", message: error.message});
 }
 })
 
