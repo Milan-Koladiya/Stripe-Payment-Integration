@@ -6,6 +6,35 @@ const stripe = require('stripe')(`${process.env.STRIPE_PUBLIC_KEY}`)
 
 app.use(express.json());
 
+app.get('/getbalance', async (req,res) => {
+    try {
+        const balance = await stripe.balance.retrieve((error, balance) => {
+            if(balance){
+                return  res.status(200).json({sucess: "true", balance });
+            }else{
+                throw new Error("Error occuredd")
+            }
+        })
+    } catch (error) {
+        res.status(400).json({sucess: "false", message: error.message})
+    }
+})
+
+app.post('/retrivepayment', async (req, res) => {
+    try {
+        const bodyData = req.body
+        if(!bodyData.paymentID){
+            throw new Error("Please add all the filed")
+        }
+        const retrivepayment = await stripe.charges.retrieve(
+            bodyData.paymentID
+          );
+        res.status(200).json({sucess: "true", retrivepayment });
+    } catch (error) {
+        res.status(400).json({sucess: "false", error: error.message})
+    }
+});
+
 app.post('/product', async (req, res) => {
     try {
         const bodyData = req.body
@@ -109,11 +138,11 @@ app.post('/payment', async (req, res) => {
     if(bodyData.paymentMethod  == 'bankaccount'){
         createToken = await stripe.tokens.create({
             bank_account: {
-                country: 'INDIA',
+                country: 'IN',
                 currency: 'inr',
                 account_holder_name: bodyData.bankHoldername,
                 account_holder_type: bodyData.bankHoldertype,
-                routing_number: '110000000',
+                routing_number: bodyData.routingNumber,
                 account_number: bodyData.bankAccountNumber,
               },
         })
